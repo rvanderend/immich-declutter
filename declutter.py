@@ -289,6 +289,15 @@ class Declutter:
 
         to_add: dict[str, list[str]] = {c: [] for c in self.cfg.categories}
 
+        def flush() -> None:
+            # Albums first, then state: a crash in between must never leave 'proposed'
+            # assets outside their album (the next run would mistake them for 'kept').
+            for cat, ids in to_add.items():
+                if ids and not self.cfg.dry_run:
+                    self.immich.add_to_album(album_ids[cat], ids)
+                ids.clear()
+            self.state.commit()
+
         def work(asset: dict):
             try:
                 return asset, *self.analyse(asset), None
@@ -310,20 +319,17 @@ class Declutter:
                         self.state.fail(asset["id"], error)
                 elif cat:
                     to_add[cat].append(asset["id"])
+                    result.new[cat] += 1
                     LOG.info("Candidate %-11s %-28s %s", cat, reason, asset.get("originalPath"))
                     if not self.cfg.dry_run:
                         self.state.set(asset["id"], "proposed", cat, reason)
                 elif not self.cfg.dry_run:
                     self.state.set(asset["id"], "none")
                 if n % 500 == 0:
-                    self.state.commit()
+                    flush()
                     LOG.info("... %d/%d evaluated", n, len(assets))
 
-        for cat, ids in to_add.items():
-            result.new[cat] = len(ids)
-            if ids and not self.cfg.dry_run:
-                self.immich.add_to_album(album_ids[cat], ids)
-
+        flush()
         if not self.cfg.dry_run:
             self.state.set_meta("cutoff", iso(until))
             self.state.set_meta("last_run", iso(datetime.now(timezone.utc)))
