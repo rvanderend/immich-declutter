@@ -5,7 +5,7 @@ A headless companion container for [Immich](https://immich.app). Every night it 
 | Album | What ends up there |
 |---|---|
 | 🧹 Memes & web images | memes, cartoons, quote images, pictures saved from the web |
-| 🧹 TikTok & Reels | videos with a TikTok/Reels/CapCut watermark or in TikTok's 576×1024 format |
+| 🧹 TikTok & Reels | videos with a TikTok/Reels/CapCut watermark |
 | 🧹 Screenshots | screenshots of apps, chats, maps and websites |
 | 🧾 Receipts & barcodes | till receipts, invoices, barcodes, QR codes, shipping labels, tickets |
 
@@ -21,7 +21,7 @@ The rules live in [`rules.py`](rules.py). They combine three signals that Immich
 - **CLIP image understanding.** Calls Immich's own machine-learning service, so it uses the same model as Smart Search and needs no extra download. Each thumbnail is scored zero-shot against prompts such as *"an internet meme with text"* or *"a screenshot of an app"*, versus negatives like *"a family photo"* or *"a photo of a baby"*.
 - **OCR.** Uses Immich's built-in text recognition to spot watermarks (TikTok, 9GAG, …), till-receipt vocabulary (*total*, *VAT*, *subtotal*, plus Dutch terms) and the classic meme layout: big text in a band at the top or bottom and nothing else.
 - **Metadata.**
-  - Memes, TikToks and screenshots carry no camera make in their EXIF, so photos *with* a camera make are only checked for receipts and barcodes.
+  - Memes, TikToks and screenshots carry no camera make in their EXIF, so photos *with* a camera make are only checked for receipts and barcodes. They also need real OCR text, because on its own CLIP's barcode prompt fires on things like airplanes.
   - Images saved from Facebook are exactly 790 px wide.
   - Small images (≤ 640 px) in a size no camera produces are almost always web images.
 
@@ -29,7 +29,7 @@ The default thresholds were calibrated on a real library of ~180k assets by chec
 - CLIP meme score: ~85% of hits were right.
 - 790 px images: ~90%.
 - TikTok watermark: ~100%.
-- Receipt rule on 3,000 random camera photos: 0.17% false positives.
+- Full-library run (~170k assets) after the rules were tightened: 9 receipt candidates among ~120k camera photos, all of them paperwork.
 
 Your library will differ, so the thresholds can be tuned with `THRESHOLD_*` (see below). Run with `DRY_RUN=true` first to see what it would propose.
 
