@@ -7,11 +7,11 @@ Immich thumbnails), measured as the share of hits in random samples:
 - Memes: CLIP meme score >= 0.45 gave ~85% hits; a caption band at the top/bottom
   (OCR) combined with a CLIP caption score >= 0.5 ~40%; exactly 790 px (images saved
   from Facebook) ~90%; small (<= 640 px) images in a non-camera size ~85%.
-- TikTok: OCR watermark (tiktok/reels/capcut/...) ~100%; 576x1024 is TikTok's
-  download format.
+- TikTok: OCR watermark (tiktok/reels/capcut/...) ~100%. (The 576x1024 download
+  size alone is not used: phones record personal videos in that size too.)
 - Screenshots: CLIP screenshot score >= 0.6.
-- Receipts & barcodes: also applied to camera photos; 0.17% false positives on
-  3000 random iPhone photos.
+- Receipts & barcodes: camera photos additionally need real OCR text (>= 8 words),
+  because CLIP's barcode/receipt prompts also fire on e.g. airplanes and airports.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ RECEIPT_RECEIPT = [
 RECEIPT_BARCODE = [
     "a barcode", "a QR code", "a shipping label with a barcode", "a parcel label",
     "a ticket with a barcode", "a loyalty card with a barcode", "a screenshot of a QR code",
-    "a screenshot of a barcode", "a boarding pass",
+    "a screenshot of a barcode",
 ]
 RECEIPT_NEG = [
     "a photo of a document", "a letter", "a handwritten note", "a screenshot of a website",
@@ -79,7 +79,8 @@ RECEIPT_NEG = [
     "a photo of a floor", "a photo of a wall", "a photo of a car", "a photo of a pet",
     "a price tag in a store", "a photo of a book page", "a menu", "a map", "a meme",
     "a photo of a computer screen", "a photo of a sign", "a photo of a package box", "a calendar",
-    "a spreadsheet", "a poster", "a flyer", "a greeting card", "a drawing",
+    "a spreadsheet", "a poster", "a flyer", "a greeting card", "a drawing", "a photo of an airplane",
+    "a photo at an airport", "a photo inside an airplane", "a photo of a toy",
 ]
 
 # name -> (positive groups, negatives). Every positive group yields its own score.
@@ -92,12 +93,12 @@ SCORE_NAMES = {"general": ("meme", "screen"), "caption": ("caption",), "receipt"
 
 # --- OCR keywords ---
 
+CAMERA_MIN_OCR_WORDS = 8
 TIKTOK_WORDS = ("tiktok", "reels", "capcut", "instagram", "snapchat")
 MEME_SITE_WORDS = ("9gag", "imgflip", "dumpert", "geenstijl")
 # English + Dutch till-receipt vocabulary (Immich's OCR reads both)
 RECEIPT_WORDS = (
-    "total", "subtotal", "receipt", "vat", "cash", "change", "terminal", "transaction",
-    "maestro", "mastercard", "visa", "contactless",
+    "total", "subtotal", "receipt", "vat", "terminal", "transaction", "maestro", "mastercard",
     "totaal", "subtotaal", "btw", "kassabon", "bonnr", "pinnen", "betaald", "contant",
     "wisselgeld", "transactie", "kaartnr", "filiaal", "kassa",
 )
@@ -107,7 +108,6 @@ CAMERA_SMALL_SIZES = {
     (640, 480), (320, 240), (160, 120), (176, 144), (352, 288), (240, 240), (600, 600),
     (480, 360), (400, 300), (320, 320), (640, 360), (426, 320), (213, 160),
 }
-TIKTOK_SIZE = (1024, 576)
 
 
 @dataclass(frozen=True)
@@ -188,6 +188,13 @@ def has_camera(asset: dict) -> bool:
     return bool((asset.get("exifInfo") or {}).get("make"))
 
 
+def needs_ocr(asset: dict, scores: dict[str, float], t: Thresholds) -> bool:
+    """OCR is only fetched where it can change the outcome (camera photos: only receipt/barcode suspects)."""
+    if not has_camera(asset):
+        return True
+    return scores.get("receipt", 0) >= t.receipt_with_ocr or scores.get("barcode", 0) >= t.barcode
+
+
 def needs_analysis(asset: dict, enabled: set[str]) -> bool:
     """Whether it is worth fetching thumbnail/CLIP/OCR at all."""
     if asset.get("type") == "VIDEO":
@@ -212,8 +219,6 @@ def classify(
             return None, ""
         if w := has_word(boxes, TIKTOK_WORDS):
             return TIKTOK, f"ocr:{w}"
-        if dims(asset) == TIKTOK_SIZE:
-            return TIKTOK, "576x1024"
         if scores.get("meme", 0) >= t.meme_video:
             return TIKTOK, f"meme={scores['meme']:.2f}"
         return None, ""
@@ -223,11 +228,13 @@ def classify(
 
     if RECEIPTS in enabled:
         r, b = scores.get("receipt", 0), scores.get("barcode", 0)
-        if r >= t.receipt_with_ocr and (w := has_word(boxes, RECEIPT_WORDS)):
+        # Camera photos: CLIP alone is not enough, the photo must also contain real text
+        texty = not camera or len(_tokens(boxes)) >= CAMERA_MIN_OCR_WORDS
+        if r >= t.receipt_with_ocr and texty and (w := has_word(boxes, RECEIPT_WORDS)):
             return RECEIPTS, f"receipt={r:.2f}+ocr:{w}"
-        if r >= t.receipt:
+        if r >= t.receipt and texty:
             return RECEIPTS, f"receipt={r:.2f}"
-        if b >= t.barcode:
+        if b >= t.barcode and texty:
             return RECEIPTS, f"barcode={b:.2f}"
 
     if camera:

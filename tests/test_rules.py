@@ -44,8 +44,13 @@ def test_web_sizes():
 def test_camera_photo_only_receipts():
     cam = img(make="Apple")
     assert classify(cam, {"meme": 0.99, "screen": 0.99}, [], ALL)[0] is None
-    assert classify(cam, {"barcode": 0.8}, [], ALL)[0] == rules.RECEIPTS
-    assert classify(cam, {"receipt": 0.4}, [Box(0.5, 0.52, "TOTAAL 12,95")], ALL)[0] == rules.RECEIPTS
+    label = [Box(0.5, 0.52, "PostNL Pakket 3SABC123 Amsterdam 1012 AB retour afzender track trace")]
+    assert classify(cam, {"barcode": 0.8}, label, ALL)[0] == rules.RECEIPTS
+    # an airplane photo with a livery as its only text is not a barcode
+    assert classify(cam, {"barcode": 0.88}, [Box(0.3, 0.4, "transavia")], ALL)[0] is None
+    bon = [Box(0.5, 0.52, "AH Zwijndrecht melk 1,09 brood 2,49 kaas 5,99 TOTAAL 12,95 PIN")]
+    assert classify(cam, {"receipt": 0.4}, bon, ALL)[0] == rules.RECEIPTS
+    assert classify(cam, {"receipt": 0.4}, [Box(0.5, 0.52, "TOTAAL 12,95")], ALL)[0] is None
     assert classify(cam, {"receipt": 0.4}, [Box(0.5, 0.52, "hello")], ALL)[0] is None
     assert not rules.needs_analysis(cam, ALL - {rules.RECEIPTS})
 
@@ -57,8 +62,8 @@ def test_short_ocr_words_exact():
 
 
 def test_tiktok_video():
-    vid = img(576, 1024, type_="VIDEO")
-    assert classify(vid, {}, [], ALL) == (rules.TIKTOK, "576x1024")
+    # TikTok's download size alone is not enough: phones record personal videos in it too
+    assert classify(img(576, 1024, type_="VIDEO"), {}, [], ALL)[0] is None
     vid2 = img(720, 1280, type_="VIDEO")
     assert classify(vid2, {}, [Box(0.9, 0.95, "TikTok @iemand")], ALL)[0] == rules.TIKTOK
     assert classify(vid2, {"meme": 0.3}, [], ALL)[0] is None
@@ -88,3 +93,15 @@ def test_boxes_from_api():
 def test_english_receipt_words():
     assert rules.has_word([Box(0, 0.1, "SUBTOTAL 12.95")], rules.RECEIPT_WORDS) == "total"
     assert rules.has_word([Box(0, 0.1, "VAT 20%")], rules.RECEIPT_WORDS) == "vat"
+
+
+def test_needs_ocr():
+    t = rules.Thresholds()
+    assert rules.needs_ocr(img(), {}, t)
+    assert not rules.needs_ocr(img(make="Apple"), {"receipt": 0.1, "barcode": 0.5}, t)
+    assert rules.needs_ocr(img(make="Apple"), {"barcode": 0.8}, t)
+
+
+def test_generic_words_dropped():
+    # 'cash'/'change' matched a toy cash register and a petrol pump
+    assert rules.has_word([Box(0, 0.1, "CASH REGISTER change")], rules.RECEIPT_WORDS) is None

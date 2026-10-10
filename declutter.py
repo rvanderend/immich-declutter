@@ -267,8 +267,7 @@ class Declutter:
     def analyse(self, asset: dict) -> tuple[str | None, str]:
         data, mime = self.immich.thumbnail(asset["id"])
         scores = self.clip.scores(self.clip.image(data, mime))
-        # Only fetch OCR where it can matter (camera photo: only when it might be a receipt)
-        need_ocr = not rules.has_camera(asset) or scores.get("receipt", 0) >= self.cfg.thresholds.receipt_with_ocr
+        need_ocr = rules.needs_ocr(asset, scores, self.cfg.thresholds)
         boxes = rules.boxes_from_api(self.immich.ocr(asset["id"])) if need_ocr else []
         return rules.classify(asset, scores, boxes, self.cfg.categories, self.cfg.thresholds)
 
