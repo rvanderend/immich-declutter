@@ -1,0 +1,27 @@
+# docker compose up -d
+# Runs next to a standard Immich docker-compose installation and joins its network,
+# so both immich-server and immich-machine-learning are reachable by name.
+services:
+  immich-declutter:
+    container_name: immich-declutter
+    image: ghcr.io/rvanderend/immich-declutter:latest
+    # or build it yourself:
+    # build: .
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+    networks:
+      - immich
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  immich:
+    external: true
+    # Default network name of Immich's compose project; check with `docker network ls`
+    name: immich_default

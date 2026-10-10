@@ -1,0 +1,13 @@
+.env
+.git
+.gitignore
+.idea
+.vscode
+__pycache__
+*.pyc
+README.md
+compose.yaml
+tests
+requirements-dev.txt
+.pytest_cache
+data
