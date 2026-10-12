@@ -274,6 +274,15 @@ class Declutter:
     # --- run ---
 
     def run(self) -> RunResult:
+        try:
+            return self._run()
+        except BaseException:
+            # Drop uncommitted rows: 'proposed' assets whose album flush failed would
+            # otherwise be committed by the next run and mistaken for 'kept'.
+            self.state.rollback()
+            raise
+
+    def _run(self) -> RunResult:
         result = RunResult(new={c: 0 for c in sorted(self.cfg.categories)})
         self.immich.ping()
         self.immich.check_access()

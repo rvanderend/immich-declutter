@@ -96,3 +96,25 @@ def test_albums_filled_before_state_commit(tmp_path, monkeypatch):
     immich.add_to_album = lambda aid, ids: (calls.append(len(ids)), orig(aid, ids))
     d.run()
     assert calls == [500, 100]
+
+
+def test_failed_album_flush_rolls_back_state(tmp_path, monkeypatch):
+    """A failing album add must not leave 'proposed' rows behind for the next run to commit."""
+    d, immich, cfg = make(tmp_path, monkeypatch, [asset("meme1"), asset("photo")])
+    real_add = immich.add_to_album
+
+    def forbidden(aid, ids):
+        raise RuntimeError("403 Forbidden")
+
+    immich.add_to_album = forbidden
+    try:
+        d.run()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("run should fail")
+
+    immich.add_to_album = real_add
+    r = d.run()
+    assert (r.kept, r.new[rules.MEMES]) == (0, 1)
+    assert immich.album_members[cfg.albums[rules.MEMES]] == {"meme1"}

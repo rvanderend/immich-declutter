@@ -11,6 +11,10 @@ class NotFound(Exception):
     pass
 
 
+# What a restricted API key needs; "all" covers everything.
+REQUIRED_PERMISSIONS = ("asset.read", "asset.view", "album.read", "album.create", "albumAsset.create")
+
+
 class Immich:
     def __init__(self, url: str, api_key: str, timeout: int = 120) -> None:
         self.base = url.rstrip("/") + "/api"
@@ -31,7 +35,11 @@ class Immich:
         return self._req("GET", "/server/version").json()
 
     def check_access(self) -> None:
-        """Verify the API key's permissions on one existing asset (search, asset, thumbnail, ocr)."""
+        """Verify the API key's permissions, then try them on one existing asset (search, asset, thumbnail, ocr)."""
+        granted = set(self._req("GET", "/api-keys/me").json().get("permissions", []))
+        missing = [p for p in REQUIRED_PERMISSIONS if p not in granted]
+        if "all" not in granted and missing:
+            raise PermissionError(f"API key lacks permission {', '.join(missing)}")
         body = {"size": 1, "page": 1, "type": "IMAGE"}
         items = self._req("POST", "/search/metadata", json=body).json()["assets"]["items"]
         if not items:

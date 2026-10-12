@@ -82,5 +82,8 @@ class State:
     def commit(self) -> None:
         self.db.commit()
 
+    def rollback(self) -> None:
+        self.db.rollback()
+
     def counts(self) -> dict[str, int]:
         return dict(self.db.execute("SELECT status, COUNT(*) FROM assets GROUP BY status"))
