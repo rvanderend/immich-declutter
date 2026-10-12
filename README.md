@@ -4,8 +4,8 @@ A headless companion container for [Immich](https://immich.app). Every night it 
 
 | Album | What ends up there |
 |---|---|
-| 🧹 Memes & web images | memes, cartoons, quote images, pictures saved from the web |
-| 🧹 TikTok & Reels | videos with a TikTok/Reels/CapCut watermark |
+| 🧹 Memes & web images | memes, cartoons, quote images, pictures saved from the web (including stills with a TikTok watermark) |
+| 🧹 TikTok & Reels | videos only, with a TikTok/Reels/CapCut watermark |
 | 🧹 Screenshots | screenshots of apps, chats, maps and websites |
 | 🧾 Receipts & barcodes | till receipts, invoices, barcodes, QR codes, shipping labels, tickets |
 

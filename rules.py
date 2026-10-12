@@ -7,8 +7,9 @@ Immich thumbnails), measured as the share of hits in random samples:
 - Memes: CLIP meme score >= 0.45 gave ~85% hits; a caption band at the top/bottom
   (OCR) combined with a CLIP caption score >= 0.5 ~40%; exactly 790 px (images saved
   from Facebook) ~90%; small (<= 640 px) images in a non-camera size ~85%.
-- TikTok: OCR watermark (tiktok/reels/capcut/...) ~100%. (The 576x1024 download
-  size alone is not used: phones record personal videos in that size too.)
+- TikTok: videos only, OCR watermark (tiktok/reels/capcut/...) ~100%. (The 576x1024
+  download size alone is not used: phones record personal videos in that size too.)
+  Stills with a TikTok watermark go to memes.
 - Screenshots: CLIP screenshot score >= 0.6.
 - Receipts & barcodes: camera photos additionally need real OCR text (>= 8 words),
   because CLIP's barcode/receipt prompts also fire on e.g. airplanes and airports.
@@ -95,7 +96,8 @@ SCORE_NAMES = {"general": ("meme", "screen"), "caption": ("caption",), "receipt"
 
 CAMERA_MIN_OCR_WORDS = 8
 TIKTOK_WORDS = ("tiktok", "reels", "capcut", "instagram", "snapchat")
-MEME_SITE_WORDS = ("9gag", "imgflip", "dumpert", "geenstijl")
+# Images only; a TikTok watermark on a still means a saved frame, which is a meme (the TikTok album is videos only)
+MEME_SITE_WORDS = ("9gag", "imgflip", "dumpert", "geenstijl", "tiktok")
 # English + Dutch till-receipt vocabulary (Immich's OCR reads both)
 RECEIPT_WORDS = (
     "total", "subtotal", "receipt", "vat", "terminal", "transaction", "maestro", "mastercard",
@@ -222,9 +224,6 @@ def classify(
         if scores.get("meme", 0) >= t.meme_video:
             return TIKTOK, f"meme={scores['meme']:.2f}"
         return None, ""
-
-    if not camera and TIKTOK in enabled and has_word(boxes, ("tiktok",)):
-        return TIKTOK, "ocr:tiktok"
 
     if RECEIPTS in enabled:
         r, b = scores.get("receipt", 0), scores.get("barcode", 0)

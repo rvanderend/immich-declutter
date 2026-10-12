@@ -70,8 +70,9 @@ def test_tiktok_video():
     assert classify(img(576, 1024, make="Apple", type_="VIDEO"), {}, [], ALL)[0] is None
 
 
-def test_tiktok_screenshot_image():
-    assert classify(img(), {}, [Box(0.9, 0.95, "TikTok")], ALL)[0] == rules.TIKTOK
+def test_tiktok_watermark_on_image_is_meme():
+    # The TikTok album only holds videos
+    assert classify(img(), {}, [Box(0.9, 0.95, "TikTok")], ALL)[0] == rules.MEMES
 
 
 def test_screenshot_and_disabled_categories():
